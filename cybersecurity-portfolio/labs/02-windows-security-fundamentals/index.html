@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lab 02 - Windows Security Fundamentals</title>
+<style>
+:root{--bg:#ffffff;--fg:#1c2330;--muted:#5b6678;--card:#f3f5f9;--line:#d9dee7;--accent:#0b6bcb;--code:#eef1f6}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141c;--fg:#e6eaf2;--muted:#9aa5b8;--card:#171e29;--line:#2a3445;--accent:#6db3ff;--code:#1b2431}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Arial,sans-serif}
+nav{border-bottom:1px solid var(--line);background:var(--card)}
+nav div{max-width:920px;margin:0 auto;padding:12px 20px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+nav a{color:var(--fg);text-decoration:none;font-weight:600;font-size:15px}
+nav a:hover{color:var(--accent)}
+nav .brand{margin-right:auto}
+main{max-width:920px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:1.9rem;line-height:1.25;margin:.4em 0 .6em}
+h2{font-size:1.4rem;margin:2em 0 .6em;padding-bottom:.3em;border-bottom:1px solid var(--line)}
+a{color:var(--accent)}
+img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:6px 0}
+table{border-collapse:collapse;display:block;overflow-x:auto;max-width:100%;margin:1em 0}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--card)}
+td img{margin:0}
+pre{background:var(--code);padding:14px;border-radius:8px;overflow-x:auto;font-size:14px}
+code{background:var(--code);padding:2px 5px;border-radius:4px;font-size:.92em}
+pre code{background:none;padding:0}
+blockquote{margin:1em 0;padding:8px 16px;border-left:4px solid var(--accent);background:var(--card);color:var(--muted)}
+hr{border:0;border-top:1px solid var(--line);margin:2em 0}
+footer{max-width:920px;margin:0 auto;padding:0 20px 40px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<nav><div>
+<a class="brand" href="../../index.html">Jama Ali Jama - Cybersecurity Portfolio</a>
+<a href="../../labs/01-isolated-lab-setup/index.html">Lab 01</a>
+<a href="../../labs/02-windows-security-fundamentals/index.html">Lab 02</a>
+<a href="https://github.com/Jama-Yare">GitHub</a>
+<a href="https://www.linkedin.com/in/jama-ali-jama-6099962b8/">LinkedIn</a>
+</div></nav>
+<main>
+<h1 id="lab-02---windows-security-fundamentals">Lab 02 - Windows
+Security Fundamentals</h1>
+<p><strong>Dates:</strong> September 27 - October 5, 2026
+<strong>Platform:</strong> Windows 11 Pro</p>
+<p>A set of hands-on exercises covering the basic controls that protect
+a Windows system: a host firewall, least-privilege file permissions,
+antivirus detection, disk encryption and password hashing.</p>
+<table>
+<thead>
+<tr class="header">
+<th>Exercise</th>
+<th>Control</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Windows Defender Firewall (inbound and outbound rules)</td>
+<td>Screenshots 01, 02</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>NTFS permissions and local user accounts</td>
+<td>Screenshots 03, 04, 05</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Antivirus detection with the EICAR test file</td>
+<td>Screenshot 06</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Disk encryption with VeraCrypt</td>
+<td>Screenshot 07</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Password storage: plain text vs MD5 hash</td>
+<td>Screenshots 08, 09</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Inspecting browser cookies and session storage</td>
+<td>Described below, screenshots withheld</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-windows-defender-firewall">1. Windows Defender Firewall</h2>
+<p><strong>Goal:</strong> control which traffic can reach the machine
+and which programs can reach the network.</p>
+<ul>
+<li><strong>Inbound rule:</strong> created a rule named <em>Block ports
+80, 443 inbound</em>, applied to <strong>all profiles</strong>,
+<strong>enabled</strong>, with the action <strong>Block</strong>. This
+stops other machines from reaching a web server on this PC over HTTP or
+HTTPS.</li>
+<li><strong>Outbound rule:</strong> used the <em>New Outbound Rule
+Wizard</em> (Rule Type, Program, Action, Profile, Name) to build a
+program-based rule and chose <strong>Block the connection</strong>.</li>
+</ul>
+<p><img src="screenshots/01-firewall-inbound-block-rule.png"
+alt="Inbound block rule" /> <img
+src="screenshots/02-firewall-outbound-block-wizard.png"
+alt="Outbound rule wizard" /></p>
+<p><strong>What I learned:</strong> a firewall rule is defined by
+direction, program or port, profile (Domain, Private, Public) and
+action. Explicit <strong>Block</strong> rules take precedence over
+<strong>Allow</strong> rules, so a block rule can override an
+application's own allow rule. Rules should follow least privilege: only
+open what a service really needs.</p>
+<p><em>Only the rule I created is shown; the rest of my rule list is
+cropped out on purpose.</em></p>
+<h2 id="2-file-permissions-and-local-users">2. File permissions and
+local users</h2>
+<p><strong>Goal:</strong> give a different user the minimum access
+needed.</p>
+<ul>
+<li>Created local user accounts on the PC.</li>
+<li>On the folder <code>CS15</code>, opened <strong>Properties &gt;
+Security</strong> and selected the user <code>LAP USER</code>.</li>
+<li>Gave that user <strong>Read only</strong>. Full control, Modify,
+Read &amp; execute, List folder contents and Write are not granted.</li>
+</ul>
+<p><img src="screenshots/03-folder-security-tab-read-only.png"
+alt="Security tab" /> <img
+src="screenshots/04-folder-permissions-dialog.png"
+alt="Permissions dialog" /> <img
+src="screenshots/05-local-user-accounts.png"
+alt="Local user accounts" /></p>
+<p><strong>What I learned:</strong> the <strong>principle of least
+privilege</strong>. A user who only needs to read files should not be
+able to change or delete them. This limits the damage from mistakes and
+from malware running under that account.</p>
+<h2 id="3-antivirus-detection-eicar">3. Antivirus detection (EICAR)</h2>
+<p><strong>Goal:</strong> confirm that antivirus protection works,
+without using real malware.</p>
+<p>I downloaded the <strong>EICAR test file</strong>, a harmless
+standard string that every antivirus product is designed to flag.
+Windows Security blocked it immediately:</p>
+<ul>
+<li>Threat blocked, severity <strong>Severe</strong>, on 9/27/2026 at
+11:20 AM</li>
+<li>Detected as <code>Tool:Win32/EICAR_Test_File</code></li>
+<li>Status: <strong>Removed</strong>, from my Downloads folder</li>
+</ul>
+<p><img src="screenshots/06-defender-eicar-detection.png"
+alt="Defender detection" /></p>
+<p><strong>What I learned:</strong> how to read a Windows Security
+<em>Protection history</em> entry (what was detected, when, where the
+file came from and what action was taken). That is the same kind of
+information a SOC analyst reads in an endpoint alert.</p>
+<h2 id="4-disk-encryption-with-veracrypt">4. Disk encryption with
+VeraCrypt</h2>
+<p><strong>Goal:</strong> protect data at rest.</p>
+<p>I created an encrypted <strong>VeraCrypt volume</strong> named
+<code>myvolume</code>, about <strong>2 GB</strong> (2,097,152 KB). When
+it is dismounted, its contents are unreadable without the password.</p>
+<p><img src="screenshots/07-veracrypt-encrypted-volume.png"
+alt="VeraCrypt volume" /></p>
+<p><strong>What I learned:</strong> an encrypted container protects
+files if the laptop is lost or stolen. The password and key must be
+strong and kept safe, because there is no way to recover the data
+without them.</p>
+<h2 id="5-password-storage-plain-text-vs-md5-hash">5. Password storage:
+plain text vs MD5 hash</h2>
+<p><strong>Goal:</strong> see why passwords must never be stored in
+plain text.</p>
+<p>In MySQL (via phpMyAdmin) I created a <code>users</code> table with a
+demo account. The password was a <strong>throwaway demo value</strong>,
+not a real password.</p>
+<p><strong>Before</strong> - the password is readable by anyone who can
+see the database:</p>
+<p><img src="screenshots/08-mysql-plaintext-before.png"
+alt="Plain text password" /></p>
+<p>I then hashed it with MySQL's built-in function:</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode sql"><code class="sourceCode sql"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">UPDATE</span> users <span class="kw">SET</span> <span class="kw">password</span> <span class="op">=</span> MD5(<span class="kw">password</span>);</span></code></pre></div>
+<p><strong>After</strong> - the stored value is a 32-character hash:</p>
+<p><img src="screenshots/09-mysql-md5-after.png" alt="MD5 hash" /></p>
+<p>I double-checked the result outside the database with Python:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode python"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> hashlib</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="bu">print</span>(hashlib.md5(<span class="st">b&quot;Password123&quot;</span>).hexdigest())</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="co"># 42f749ade7f9e195bf475f37a44cafcb   &lt;- matches the value stored in the table</span></span></code></pre></div>
+<p><strong>What I learned:</strong></p>
+<ul>
+<li>A hash is one-way, so a database leak no longer exposes the password
+directly.</li>
+<li><strong>MD5 is not safe for real password storage.</strong> It is
+very fast, and it has no salt, so the same password always gives the
+same hash. Attackers can crack common passwords with precomputed tables
+and fast guessing.</li>
+<li>Real systems should use a slow, salted password-hashing algorithm
+such as <strong>bcrypt</strong>, <strong>scrypt</strong> or
+<strong>Argon2</strong>.</li>
+</ul>
+<h2 id="6-browser-cookies-and-session-storage-screenshots-withheld">6.
+Browser cookies and session storage (screenshots withheld)</h2>
+<p>I also used Chrome DevTools (Application tab) to inspect how a
+website stores <strong>cookies</strong> and <strong>session
+storage</strong>: cookie names, expiry, <code>Secure</code> and
+<code>HttpOnly</code> flags, and the values kept in session storage.</p>
+<p>I did not publish these screenshots. Session cookies can sometimes be
+copied to take over a logged-in session, so showing live values would be
+a security risk. Keeping them out is part of how I handle evidence.</p>
+<h2 id="summary-of-skills-shown">Summary of skills shown</h2>
+<ul>
+<li>Creating and reasoning about firewall rules (direction, profile,
+action)</li>
+<li>Applying least-privilege NTFS permissions to a local user</li>
+<li>Reading antivirus protection history and handling a detection</li>
+<li>Encrypting data at rest with VeraCrypt</li>
+<li>Explaining why password hashing matters and why MD5 is not
+enough</li>
+<li>Protecting sensitive evidence when documenting security work</li>
+</ul>
+</main>
+<footer>Lab environments are isolated and owned by the author. Do not test systems you do not own.</footer>
+</body>
+</html>
