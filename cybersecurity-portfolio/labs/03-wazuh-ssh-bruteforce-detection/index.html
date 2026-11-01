@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+
+<html class="" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1, viewport-fit=cover" name="viewport"/>
+<title>Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh</title>
+<meta content="light dark" name="color-scheme"/>
+<link href="../../assets/style.css" rel="stylesheet"/>
+<script>(function(){var r=document.documentElement;r.classList.add('js');try{var t=localStorage.getItem('theme');if(t)r.setAttribute('data-theme',t)}catch(e){}})();</script>
+<script defer="" src="../../assets/site.js"></script>
+</head>
+<body class="lab"><a class="skip" href="#main">Skip to content</a>
+<nav aria-label="Main"><div>
+<a class="brand" href="../../index.html">Jama Ali Jama - Cybersecurity Portfolio</a>
+<a href="../../labs/01-isolated-lab-setup/index.html">Lab 01</a>
+<a href="../../labs/02-windows-security-fundamentals/index.html">Lab 02</a>
+<a aria-current="page" href="../../labs/03-wazuh-ssh-bruteforce-detection/index.html">Lab 03</a>
+<a href="../../labs/04-wazuh-windows-failed-logon-detection/index.html">Lab 04</a>
+<a href="https://github.com/Jama-Yare" rel="noopener noreferrer" target="_blank">GitHub</a>
+<a href="https://www.linkedin.com/in/jama-ali-jama-6099962b8/" rel="noopener noreferrer" target="_blank">LinkedIn</a>
+</div></nav>
+<main id="main">
+<h1 id="lab-03---detecting-ssh-brute-force-attempts-with-wazuh">Lab 03 -
+Detecting SSH Brute-Force Attempts with Wazuh</h1>
+<p class="lab-meta"><strong>Date:</strong> October 31, 2026 <strong>Platform:</strong>
+Wazuh 4.14.9, Ubuntu Server 24.04.5 LTS, Kali Linux, Oracle
+VirtualBox</p>
+<p>I enrolled a new Ubuntu Server VM as a Wazuh agent, then generated
+repeated failed SSH logins against it from Kali Linux. Wazuh detected
+the activity, raised alerts at two severity levels and mapped them to
+MITRE ATT&amp;CK techniques for <strong>Brute Force (T1110)</strong> and
+<strong>Password Guessing (T1110.001)</strong>.</p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Step</th>
+<th>What I did</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>1</td>
+<td>Enrolled <code>ubuntu01</code> as Wazuh agent 003</td>
+<td>Screenshot 01</td>
+</tr>
+<tr class="even">
+<td>2</td>
+<td>Confirmed the attacker address on Kali</td>
+<td>Screenshot 02</td>
+</tr>
+<tr class="odd">
+<td>3</td>
+<td>Generated failed SSH logins and listed the alerts</td>
+<td>Screenshot 03</td>
+</tr>
+<tr class="even">
+<td>4</td>
+<td>Read a single failed-login alert (rule 5760)</td>
+<td>Screenshot 04</td>
+</tr>
+<tr class="odd">
+<td>5</td>
+<td>Read the brute-force alert from Kali (rule 2502)</td>
+<td>Screenshots 05, 06, 07</td>
+</tr>
+<tr class="even">
+<td>6</td>
+<td>Reviewed the MITRE ATT&amp;CK dashboard</td>
+<td>Screenshots 08, 09</td>
+</tr>
+</tbody>
+</table></div>
+<hr />
+<h2 id="lab-environment">Lab environment</h2>
+<p>Everything ran in an isolated VirtualBox host-only network
+(<code>192.168.56.0/24</code>). I only tested against machines I
+own.</p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Machine</th>
+<th>Role</th>
+<th>Host-only IP</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Wazuh server</td>
+<td>Manager, Indexer and Dashboard (4.14.9)</td>
+<td>192.168.56.105</td>
+</tr>
+<tr class="even">
+<td>ubuntu01 (Ubuntu Server 24.04.5 LTS)</td>
+<td>Monitored endpoint, Wazuh agent 003</td>
+<td>192.168.56.113</td>
+</tr>
+<tr class="odd">
+<td>Kali Linux</td>
+<td>Attacker machine</td>
+<td>192.168.56.108</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="1-install-the-wazuh-agent-on-ubuntu">1. Install the Wazuh agent
+on Ubuntu</h2>
+<p><strong>Goal:</strong> make the Ubuntu VM send its logs to the Wazuh
+manager.</p>
+<p>I downloaded the agent package that matches the manager version and
+installed it with the manager address set. The agent version must not be
+newer than the manager, so I used 4.14.9 on both.</p>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">wget</span> https://packages.wazuh.com/4.x/apt/pool/main/w/wazuh-agent/wazuh-agent_4.14.9-1_amd64.deb</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> WAZUH_MANAGER=<span class="st">&#39;192.168.56.105&#39;</span> WAZUH_AGENT_NAME=<span class="st">&#39;ubuntu01&#39;</span> dpkg <span class="at">-i</span> ./wazuh-agent_4.14.9-1_amd64.deb</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl daemon-reload</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl enable <span class="at">--now</span> wazuh-agent</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">sudo</span> systemctl status wazuh-agent</span></code></pre></div>
+<p>The dashboard lists <code>ubuntu01</code> as agent 003, status
+<strong>active</strong>, version 4.14.9.</p>
+<p><img src="screenshots/01-wazuh-agents-active.png"
+alt="Agents active in Wazuh" /></p>
+<p><strong>What I learned:</strong> an agent needs two things to work:
+the same or older version than the manager, and a network path to it.
+The VM needed both a host-only adapter (to reach the manager) and a NAT
+adapter (to download the package).</p>
+<h2 id="2-confirm-the-attacker-machine">2. Confirm the attacker
+machine</h2>
+<p>On Kali I checked the host-only address that would be the source of
+the attempts:</p>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">ip</span> a</span></code></pre></div>
+<p><img src="screenshots/02-kali-attacker-ip.png"
+alt="Kali IP address" /></p>
+<p>Kali's <code>eth0</code> has <code>192.168.56.108</code>, which is
+the address I expected to see in the alerts.</p>
+<h2 id="3-generate-failed-ssh-logins">3. Generate failed SSH logins</h2>
+<p>I tried to log in over SSH with incorrect passwords, first from the
+Ubuntu VM itself to confirm that log collection worked, then repeatedly
+from Kali:</p>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ssh</span> ubuntu01@192.168.56.113</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="co"># entered wrong passwords several times in quick succession</span></span></code></pre></div>
+<p>In the dashboard I opened <strong>Threat Hunting</strong>, selected
+the <code>ubuntu01</code> agent and filtered on
+<code>rule.groups: authentication_failed</code>. The view showed 51
+events in the last 24 hours. The failed logins appear as three kinds of
+alert:</p>
+<p><img src="screenshots/03-alert-list-ubuntu01.png"
+alt="Alert list for ubuntu01" /></p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Rule ID</th>
+<th>Level</th>
+<th>Description</th>
+<th>MITRE technique</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>5760</td>
+<td>5</td>
+<td>sshd: authentication failed</td>
+<td>T1110.001 Password Guessing, T1021.004 SSH</td>
+</tr>
+<tr class="even">
+<td>5503</td>
+<td>5</td>
+<td>PAM: User login failed</td>
+<td>none</td>
+</tr>
+<tr class="odd">
+<td>2502</td>
+<td><strong>10</strong></td>
+<td>syslog: User missed the password more than one time</td>
+<td>T1110 Brute Force</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>What I learned:</strong> one failed login produces several
+alerts, because Linux logs each failure through more than one component
+(sshd, PAM and syslog). When failures repeat quickly, rule 2502 raises
+the severity from level 5 to level 10.</p>
+<h2 id="4-a-single-failed-login-rule-5760">4. A single failed login
+(rule 5760)</h2>
+<p><img src="screenshots/04-rule-5760-details.png"
+alt="Rule 5760 details" /></p>
+<p>The <code>full_log</code> field holds the raw line Wazuh
+collected:</p>
+<pre><code>Oct 31 11:27:26 ubuntu01 sshd[2514]: Failed password for ubuntu01 from 192.168.56.113 port 45166 ssh2</code></pre>
+<p>This first alert came from the Ubuntu VM itself, so the source IP
+equals the agent's own IP. It confirmed that SSH logs were reaching
+Wazuh. Full alert: <a
+href="evidence/alert-rule-5760.json">evidence/alert-rule-5760.json</a>.</p>
+<h2 id="5-repeated-failures-from-kali-rule-2502">5. Repeated failures
+from Kali (rule 2502)</h2>
+<p><img src="screenshots/05-rule-2502-source-ip.png"
+alt="Rule 2502 source IP" /></p>
+<p><code>data.srcip</code> is <strong>192.168.56.108</strong> (Kali) and
+<code>data.dstuser</code> is <strong>ubuntu01</strong>. The log line
+is:</p>
+<pre><code>sshd[2652]: PAM 2 more authentication failures; logname= uid=0 euid=0 tty=ssh ruser= rhost=192.168.56.108  user=ubuntu01</code></pre>
+<p><img src="screenshots/06-rule-2502-description.png"
+alt="Rule 2502 description" /></p>
+<p>By this point the rule had fired 10 times
+(<code>rule.firedtimes: 10</code>) and carries severity <strong>level
+10</strong>.</p>
+<p><img src="screenshots/07-rule-2502-mitre-fields.png"
+alt="Rule 2502 MITRE fields" /></p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>rule.id</code></td>
+<td>2502</td>
+</tr>
+<tr class="even">
+<td><code>rule.level</code></td>
+<td>10</td>
+</tr>
+<tr class="odd">
+<td><code>rule.groups</code></td>
+<td>syslog, access_control, authentication_failed</td>
+</tr>
+<tr class="even">
+<td><code>rule.mitre.id</code></td>
+<td>T1110</td>
+</tr>
+<tr class="odd">
+<td><code>rule.mitre.technique</code></td>
+<td>Brute Force</td>
+</tr>
+<tr class="even">
+<td><code>rule.mitre.tactic</code></td>
+<td>Credential Access</td>
+</tr>
+</tbody>
+</table></div>
+<p>Full alert: <a
+href="evidence/alert-rule-2502.json">evidence/alert-rule-2502.json</a>.</p>
+<p><strong>What I learned:</strong> the alert already answers the first
+triage questions: which host, which account, which source IP, how
+severe, and which ATT&amp;CK technique.</p>
+<h2 id="6-mitre-attck-view">6. MITRE ATT&amp;CK view</h2>
+<p>For agent <code>ubuntu01</code>, the MITRE ATT&amp;CK dashboard
+grouped the activity under two tactics:</p>
+<p><img src="screenshots/08-mitre-dashboard.png"
+alt="MITRE ATT&amp;CK dashboard" /></p>
+<p><img src="screenshots/09-mitre-charts.png" alt="MITRE charts" /></p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Tactic</th>
+<th>Technique</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Credential Access</td>
+<td>T1110 Brute Force, T1110.001 Password Guessing</td>
+</tr>
+<tr class="even">
+<td>Lateral Movement</td>
+<td>T1021.004 Remote Services: SSH</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="7-analyst-triage-notes">7. Analyst triage notes</h2>
+<p>If this were a real incident, these are the questions the alert
+answers:</p>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Question</th>
+<th>Answer from the alert</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>What happened?</td>
+<td>Repeated failed SSH password attempts</td>
+</tr>
+<tr class="even">
+<td>Which host?</td>
+<td>ubuntu01 (agent 003, 192.168.56.113)</td>
+</tr>
+<tr class="odd">
+<td>Which account?</td>
+<td>ubuntu01 (<code>data.dstuser</code>)</td>
+</tr>
+<tr class="even">
+<td>From where?</td>
+<td>192.168.56.108 (<code>data.srcip</code>)</td>
+</tr>
+<tr class="odd">
+<td>How severe?</td>
+<td>Level 5 for single failures, level 10 once they repeated</td>
+</tr>
+<tr class="even">
+<td>Which technique?</td>
+<td>T1110 Brute Force (Credential Access)</td>
+</tr>
+<tr class="odd">
+<td>Did it succeed?</td>
+<td>Not in this lab. Next check: look for an
+<code>Accepted password</code> event from the same source</td>
+</tr>
+</tbody>
+</table></div>
+<p>Recommended response in a real environment:</p>
+<ol type="1">
+<li>Check whether any login from the same source IP succeeded.</li>
+<li>Block or rate-limit the source IP.</li>
+<li>Confirm the targeted account is expected and has a strong
+password.</li>
+<li>Review the source machine for compromise.</li>
+</ol>
+<h2 id="8-hardening-recommendations">8. Hardening recommendations</h2>
+<ul>
+<li>Disable SSH password authentication and use key-based login.</li>
+<li>Add rate limiting or <code>fail2ban</code>.</li>
+<li>Use Wazuh Active Response to block repeated offenders
+automatically.</li>
+<li>Restrict SSH access to known management IPs.</li>
+</ul>
+<h2 id="9-troubleshooting-notes">9. Troubleshooting notes</h2>
+<div aria-label="Lab 03 - Detecting SSH Brute-Force Attempts with Wazuh table" class="table-wrap" role="region" tabindex="0"><table>
+<thead>
+<tr class="header">
+<th>Problem</th>
+<th>Cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><code>wget</code> and <code>apt update</code> failed with "Temporary
+failure in name resolution"</td>
+<td>The VM had only a host-only network and no internet</td>
+<td>Added a NAT adapter next to the host-only adapter in VirtualBox</td>
+</tr>
+<tr class="even">
+<td>The Ubuntu installer reported "Block probing did not discover any
+disks"</td>
+<td>The VM had no virtual hard disk attached</td>
+<td>Created a 25 GB VDI and attached it to the SATA controller</td>
+</tr>
+<tr class="odd">
+<td><code>403 Forbidden</code> when downloading the agent</td>
+<td>Typo in the file name (hyphen instead of underscore)</td>
+<td>Corrected the package URL</td>
+</tr>
+<tr class="even">
+<td><code>dpkg</code> and <code>systemctl</code> "command not
+found"</td>
+<td>Typos in the commands</td>
+<td>Retyped them and ran each step separately</td>
+</tr>
+<tr class="odd">
+<td>Alert times differ from log times by 3 hours</td>
+<td>Logs are in UTC, the dashboard shows local time (UTC+3)</td>
+<td>Noted it when comparing the two</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="summary-of-skills-shown">Summary of skills shown</h2>
+<ul>
+<li>Enrolling a Linux endpoint in Wazuh and verifying the
+connection</li>
+<li>Generating controlled authentication failures in an isolated
+lab</li>
+<li>Reading Wazuh alerts (rule ID, level, source IP, target user, raw
+log)</li>
+<li>Mapping alerts to MITRE ATT&amp;CK tactics and techniques</li>
+<li>Writing incident-style triage notes and hardening
+recommendations</li>
+<li>Debugging virtual lab networking and installation problems</li>
+</ul>
+<p>All testing was done on virtual machines I own, inside an isolated
+lab network.</p>
+
+<nav aria-label="Lab navigation" class="pager"><a class="prev" href="../02-windows-security-fundamentals/index.html"><small>← Previous lab</small><span>Lab 02 - Windows Security Fundamentals</span></a><a class="next" href="../04-wazuh-windows-failed-logon-detection/index.html"><small>Next lab →</small><span>Lab 04 - Detecting Failed Windows Logons (Event ID 4625) with Wazuh</span></a><a href="../../index.html"><small>Portfolio</small><span>Back to all labs</span></a></nav></main>
+<footer>Lab environments are isolated and owned by the author. Do not test systems you do not own.</footer>
+</body>
+</html>
